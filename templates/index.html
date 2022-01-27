@@ -1,0 +1,132 @@
+<!-- Source: https://stackoverflow.com/questions/56327262/capture-face-in-webcam-and-display-real-time-to-flask -->
+<div id="my_photo_booth">
+    <div id="my_camera"></div>
+
+        <script src="{{url_for('static',filename='./webcam.min.js')}}"></script>
+
+        <!-- Configure a few settings and attach camera -->
+        <script language="JavaScript">
+            Webcam.set({
+                // live preview size
+                width: 320,
+                height: 240,
+
+                // device capture size
+                dest_width: 640,
+                dest_height: 480,
+
+                // final cropped size
+                crop_width: 480,
+                crop_height: 480,
+
+                // format and quality
+                image_format: 'jpeg',
+                jpeg_quality: 90,
+
+                // flip horizontal (mirror mode)
+                flip_horiz: true
+            });
+            Webcam.attach( '#my_camera' );
+        </script>
+
+        <br>
+
+        <div id="results">
+            <!-- Your captured image will appear here... -->
+        </div>
+        <div id="compliment">
+        </div>
+
+        <!-- A button for taking snaps -->
+        <form>
+            <div id="pre_take_buttons">
+                <!-- This button is shown before the user takes a snapshot -->
+                <input type=button class="btn btn-success btn-squared" value="CAPTURE" onClick="preview_snapshot()">
+            </div>
+        </form>
+
+</div>
+<!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script> -->
+<script language="JavaScript">
+    // preload shutter audio clip
+    var shutter = new Audio();
+    shutter.autoplay = false;
+    //shutter.src = navigator.userAgent.match(/Firefox/) ? '/static/audio/shutter.ogg' : '/static/audio/shutter.mp3';
+
+    function preview_snapshot() {
+        // play sound effect
+        try { shutter.currentTime = 0; } catch(e) {;} // fails in IE
+        shutter.play();
+
+        // freeze camera so user can preview current frame
+        Webcam.freeze();        
+
+        // Display text on screen while loading
+        document.getElementById('compliment').innerHTML = "<h2>Loading...</h2>";
+
+        // saves the captured photo
+        save_photo();
+    }
+
+    function cancel_preview() {
+        // cancel preview freeze and return to live camera view
+        Webcam.unfreeze();
+
+        // swap buttons back to first set
+        document.getElementById('pre_take_buttons').style.display = '';
+        document.getElementById('post_take_buttons').style.display = 'none';
+    }
+
+    function save_photo() {
+        // actually snap photo (from preview freeze).
+        Webcam.snap( function(data_uri) {
+            // display results in page
+
+            // Download the base64 encoded image as a blob file
+            let blob = dataURItoBlob(data_uri);
+
+            // Create form data and attach the file to it -> {'file': blob}
+            let form = new FormData();
+            form.append('file', blob, 'filename');      
+
+            // TODO: Update this to make a request to microsoft API
+            // Make a POST request with the image file
+            fetch('toast',{method: 'POST', body: form}) // Assumed Base Path: http://127.0.0.1/
+                .then((response) => {
+                    return response.json();
+                })
+                .then((myJson) => {
+                    // Display results using code similar to this
+                    let compliment = myJson.result; // This can also be an error message if no human was detected
+                    document.getElementById('compliment').innerHTML = "<h2>"+compliment+"</h2>";
+                }) 
+
+        } );
+    }
+
+    // This is the function that converts the dataURI into a blob
+    function dataURItoBlob(dataURI) {
+        // convert base64 to raw binary data held in a string
+        // doesn't handle URLEncoded DataURIs - see SO answer #6850276 for code that does this
+        var byteString = atob(dataURI.split(',')[1]);
+
+        // separate out the mime component
+        var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]
+
+        // write the bytes of the string to an ArrayBuffer
+        var ab = new ArrayBuffer(byteString.length);
+
+        // create a view into the buffer
+        var ia = new Uint8Array(ab);
+
+        // set the bytes of the buffer to the correct values
+        for (var i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+
+        // write the ArrayBuffer to a blob, and you're done
+        var blob = new Blob([ab], {type: mimeString});
+        return blob;
+
+    }
+ </script>
